@@ -172,12 +172,12 @@ def parse ():
 	parser.add_argument("--network-target", "-n", help="Get targets from network. [replace --first-target and --last-target arguments]", default=None)
 	parser.add_argument("--first-target", "-f", help="First ip of targets range. [--last-target argument is required]", default=None)
 	parser.add_argument("--last-target", "-l", help="Last ip of targets range. [--first-target argument is required]", default=None)
-	parser.add_argument("--noping", "-P", help="No ping detection. [recommended for arp cache]", action="store_false")
+	parser.add_argument("--noping", "-P", help="No ping detection. [ping is recommended for arp cache]", action="store_false")
 	parser.add_argument("--noarp", "-A", help="No arp cache.", action="store_false")
-	parser.add_argument("--nohostname", "-H", help="No hostname resolution.", action="store_false")
+	parser.add_argument("--nohostname", "-H", help="With hostname resolution [scan is longest].", action="store_true")
 	parser.add_argument("--ports", "-p", help="Ports for TCP connect discovery. Example: 80,443,8080", default=None)
 	parser.add_argument("--timeout", "-t", help="Timeout for TCP connect discovery.", type=int, default=3)
-	parser.add_argument("--norealtime", "-R", help="No realtime.", action="store_false")
+	parser.add_argument("--norealtime", "-R", help="No realtime [recommended, use this option to get json Array].", action="store_false")
 
 	return parser, parser.parse_args()
 
