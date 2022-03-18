@@ -1,12 +1,13 @@
 LICENSE.txt
 MANIFEST.in
+NetworkScanner.py
 README.md
+requirements.txt
 setup.cfg
 setup.py
-NetworkScanner/NetworkScanner.py
-NetworkScanner/__init__.py
 NetworkScanner.egg-info/PKG-INFO
 NetworkScanner.egg-info/SOURCES.txt
 NetworkScanner.egg-info/dependency_links.txt
 NetworkScanner.egg-info/entry_points.txt
+NetworkScanner.egg-info/requires.txt
 NetworkScanner.egg-info/top_level.txt
