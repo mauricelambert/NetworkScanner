@@ -3,7 +3,7 @@
 
 ###################
 #    This module implements a NetworkScanner.
-#    Copyright (C) 2021  Maurice Lambert
+#    Copyright (C) 2021, 2022  Maurice Lambert
 
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@
 """
 This module implements a NetworkScanner.
 
-~# python3 NetworkScanner.py -t 172.18.0.1-172.18.0.15
+~# python3 NetworkScanner.py -I -t 172.18.0.1-172.18.0.15
 
 NetworkScanner  Copyright (C) 2021, 2022  Maurice Lambert
 This program comes with ABSOLUTELY NO WARRANTY.
@@ -40,7 +40,7 @@ under certain conditions.
 172.18.0.14
 172.18.0.10
 
-~# python3 NetworkScanner.py -d --noping --hostname --ports 22 80 -p 445 139 443 -T 1 -R -s -t 172.18.0.0/28
+~# python3 NetworkScanner.py -d --async --noping --hostname --ports 22 80 -p 445 139 443 -T 1 -R -t 172.18.0.0/28
 
 NetworkScanner  Copyright (C) 2021, 2022  Maurice Lambert
 This program comes with ABSOLUTELY NO WARRANTY.
@@ -120,7 +120,7 @@ under certain conditions.
 UP: 172.18.0.9
 DOWN:
 
-~# python NetworkScanner.py -d -t 172.18.0.0/28
+~# python NetworkScanner.py -d -I -t 172.18.0.0/28
 
 NetworkScanner  Copyright (C) 2021, 2022  Maurice Lambert
 This program comes with ABSOLUTELY NO WARRANTY.
@@ -206,7 +206,7 @@ under certain conditions.
 [2016-06-22 05:02:53] INFO     (20) {__main__ - NetworkScanner.py:433} Stop AsyncSniffer, scan end.
 [2016-06-22 05:02:53] DEBUG    (10) {__main__ - NetworkScanner.py:672} Scan end.
 
-~# python NetworkScanner.py --noping --hostname --ports 22 80 -p 445 139 443 -T 1 -R -s -t 172.18.0.0/28
+~# python NetworkScanner.py --noping --hostname --ports 22 80 -p 445 139 443 -T 1 -R -t 172.18.0.0/28
 
 NetworkScanner  Copyright (C) 2021, 2022  Maurice Lambert
 This program comes with ABSOLUTELY NO WARRANTY.
@@ -219,20 +219,20 @@ This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions.
 
-UP: 172.18.0.9
-UP: 172.18.0.10
-DOWN: 172.18.0.13
-DOWN: 172.18.0.5
-DOWN: 172.18.0.12
-DOWN: 172.18.0.14
-DOWN: 172.18.0.7
-DOWN: 172.18.0.4
-DOWN: 172.18.0.11
-DOWN: 172.18.0.3
-DOWN: 172.18.0.6
-DOWN: 172.18.0.2
-DOWN: 172.18.0.1
-DOWN: 172.18.0.8
+[+] IP: '172.18.0.9' is UP and MAC address is '00:11:22:33:44:55'
+[+] IP: '172.18.0.10' is UP and MAC address is 'aa:bb:cc:dd:ee:ff'
+[-] IP: '172.18.0.13' is DOWN
+[-] IP: '172.18.0.5' is DOWN
+[-] IP: '172.18.0.12' is DOWN
+[-] IP: '172.18.0.14' is DOWN
+[-] IP: '172.18.0.7' is DOWN
+[-] IP: '172.18.0.4' is DOWN
+[-] IP: '172.18.0.11' is DOWN
+[-] IP: '172.18.0.3' is DOWN
+[-] IP: '172.18.0.6' is DOWN
+[-] IP: '172.18.0.2' is DOWN
+[-] IP: '172.18.0.1' is DOWN
+[-] IP: '172.18.0.8' is DOWN
 
 ~#
 
@@ -265,7 +265,7 @@ IP: '172.18.0.3' is UP ('ARP', None).
 >>>
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __author__ = "Maurice Lambert"
 __author_email__ = "mauricelambert434@gmail.com"
 __maintainer__ = "Maurice Lambert"
@@ -302,6 +302,7 @@ from subprocess import PIPE, DEVNULL, getoutput
 from argparse import ArgumentParser, Namespace
 from logging import Logger, DEBUG, WARNING
 from typing import List, Set, TypeVar, Any
+from PythonToolsKit.PrintF import printf
 from socket import gethostbyaddr, herror
 from collections.abc import Callable
 from functools import partial
@@ -713,8 +714,37 @@ class NetworkScanner:
                     self._handle_UP(ip, "tcp", port)
                     return True
 
-        debug(f"{ip!r} is probably not up.")
+        debug(f"{ip!r} does not responds to ping/hostname/TCP.")
         return False
+
+
+class ConsoleScanner(NetworkScanner):
+    def handle_DOWN(self, ip: str) -> None:
+
+        """
+        This function prints IP address down using printf.
+        """
+
+        printf(f"IP: {ip!r} is DOWN", "NOK")
+
+    def handle_UP(self, ip: str, reason: str, detail: Any = None) -> None:
+
+        """
+        This function prints IP address up using printf.
+        """
+
+        if reason == "tcp":
+            printf(f"IP: {ip!r} is UP and port {detail!r} is open.")
+        elif reason == "hostname":
+            printf(f"IP: {ip!r} is UP with hostname: {detail!r}.")
+        elif reason == "ping":
+            printf(f"IP: {ip!r} is UP and responds to ping.")
+        elif reason == "IP" or (reason == "ARP" and detail):
+            printf(f"IP: {ip!r} is UP and MAC address is {detail!r}")
+        elif reason == "ARP":
+            printf(f"IP: {ip!r} is UP but does not respond to ping.")
+        else:
+            printf(f"IP: {ip!r} is UP.")
 
 
 def parse_args() -> Namespace:
@@ -782,9 +812,16 @@ def parse_args() -> Namespace:
         action="store_true",
     )
     add_argument(
-        "--print-state",
-        "-s",
-        help="Print IP state (default print IP UP only).",
+        "--print-ip",
+        "-I",
+        help="Print only the IP address if UP.",
+        action="store_true",
+    )
+    add_argument(
+        "--force-asynchronous",
+        "--async",
+        "-a",
+        help="Force asynchronous mode, using asyncio instead of scapy.",
         action="store_true",
     )
 
@@ -806,10 +843,10 @@ def main() -> int:
         log_runtime.setLevel(WARNING + 1)
 
     no_realtime = arguments.no_realtime
-    print_state = arguments.print_state
+    print_ip = arguments.print_ip
 
     debug("Build NetworkScanner...")
-    scanner = NetworkScanner(
+    scanner = ConsoleScanner(
         {str(ip) for addresses in arguments.targets for ip in addresses},
         ping=arguments.noping,
         ports=arguments.ports,
@@ -823,19 +860,19 @@ def main() -> int:
     if no_realtime:
         scanner.handle_UP = lambda *args: None
         scanner.handle_DOWN = lambda x: None
-    elif not print_state:
+    elif print_ip:
         scanner.handle_UP = lambda *args: print(args[0])
         scanner.handle_DOWN = lambda x: None
 
     debug("The scan begins...")
-    scanner.scan(SCAPY)
+    scanner.scan(SCAPY and not arguments.force_asynchronous)
     debug("Scan end.")
 
-    if no_realtime and print_state:
+    if no_realtime and print_ip:
+        print("\n".join(scanner.hosts_up))
+    elif no_realtime:
         print("UP:", "\nUP: ".join(scanner.hosts_up))
         print("DOWN:", "\nDOWN: ".join(scanner.hosts_down))
-    elif no_realtime:
-        print("\n".join(scanner.hosts_up))
 
     return 0
 

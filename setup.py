@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="NetworkScanner",
-    version="1.0.0",
+    version="1.0.1",
     py_modules=["NetworkScanner"],
     install_requires=["PythonToolsKit"],
     author="Maurice Lambert",
@@ -32,7 +32,7 @@ setup(
         "Operating System :: MacOS",
     ],
     entry_points={
-        "console_scripts": ["NetworkScan = NetworkScanner:scanner"],
+        "console_scripts": ["NetworkScan = NetworkScanner:main"],
     },
     python_requires=">=3.6",
     keywords=[
