@@ -38,6 +38,7 @@ python3 -m NetworkScanner -t 172.18.0.1-172.18.0.15
 
 # Entry point (console)
 NetworkScanner -d --noping --hostname --ports 22 80 -p 445 139 443 -T 1 -R -s -t 172.18.0.0/28
+NetworkScanner -i 172.18.0. -P -t 172.18.0.0/28 # Passive scan using scapy sniffer
 ```
 
 ### Python3
@@ -75,6 +76,7 @@ class CustomNetworkScanner(NetworkScanner):
 
 scanner = NetworkScanner({"172.18.0.1", "172.18.0.3"})
 scanner.scan()
+scanner.scan(passive=True) # passive mode using scapy sniffer
 ```
 
 ## Useful usages
@@ -156,21 +158,20 @@ scanner.scan(False)
 ## Help
 
 ```text
-~# python3 NetworkScanner.py --help
 usage: NetworkScanner.py [-h] [--interface INTERFACE] --targets TARGETS [TARGETS ...] [--noping] [--noarp]
                          [--hostname] [--ports PORTS [PORTS ...]] [--timeout TIMEOUT] [--no-realtime] [--debug]
-                         [--print-state]
+                         [--print-ip] [--force-asynchronous] [--passive-scan]
 
 This program scans networks and IP address ranges.
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --interface INTERFACE, -i INTERFACE
                         Part of the IP, MAC or name of the interface
   --targets TARGETS [TARGETS ...], -t TARGETS [TARGETS ...]
                         Targets from networks and IP address ranges.
-  --noping, -P          No ping detection. [Without scapy ping is required for ARP detection]
-  --noarp, -A           No arp detection.
+  --noping, -g          No ping detection. [Without scapy ping is required for ARP detection]
+  --noarp, -A           No arp cache.
   --hostname, -H        Test the hostname resolution to defined if host is UP (longer).
   --ports PORTS [PORTS ...], -p PORTS [PORTS ...]
                         Test the TCP port connections to defined if the host is UP.
@@ -178,7 +179,12 @@ optional arguments:
                         Connections timeout.
   --no-realtime, -R     Do not print results in real time.
   --debug, -d           Debug mode (logger level debug).
-  --print-state, -s     Print IP state (default print IP UP only).
+  --print-ip, -I        Print only the IP address if UP.
+  --force-asynchronous, --async, -a
+                        Force asynchronous mode, using asyncio instead of scapy.
+  --passive-scan, --passive, -P
+                        Passive scan, sniff the network packets to identify who is up. This scan is endless because
+                        you can never be sure to have detected all the IP addresses.
 ```
 
 ## Licence

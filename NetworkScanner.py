@@ -3,7 +3,7 @@
 
 ###################
 #    This module implements a NetworkScanner.
-#    Copyright (C) 2021, 2022  Maurice Lambert
+#    Copyright (C) 2021, 2022, 2023  Maurice Lambert
 
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -20,39 +20,16 @@
 ###################
 
 """
-This module implements a NetworkScanner.
+This module implements a passive NetworkScanner and an active NetworkScanner
+using ARP and ping scan IP sweep and hostname resolution.
 
 ~# python3 NetworkScanner.py -I -t 172.18.0.1-172.18.0.15
-
-NetworkScanner  Copyright (C) 2021, 2022  Maurice Lambert
-This program comes with ABSOLUTELY NO WARRANTY.
-This is free software, and you are welcome to redistribute it
-under certain conditions.
-
-
-PythonToolsKit  Copyright (C) 2022  Maurice Lambert
-This program comes with ABSOLUTELY NO WARRANTY.
-This is free software, and you are welcome to redistribute it
-under certain conditions.
-
 172.18.0.9
 172.18.0.13
 172.18.0.14
 172.18.0.10
 
 ~# python3 NetworkScanner.py -d --async --noping --hostname --ports 22 80 -p 445 139 443 -T 1 -R -t 172.18.0.0/28
-
-NetworkScanner  Copyright (C) 2021, 2022  Maurice Lambert
-This program comes with ABSOLUTELY NO WARRANTY.
-This is free software, and you are welcome to redistribute it
-under certain conditions.
-
-
-PythonToolsKit  Copyright (C) 2022  Maurice Lambert
-This program comes with ABSOLUTELY NO WARRANTY.
-This is free software, and you are welcome to redistribute it
-under certain conditions.
-
 [2016-06-22 05:01:12] DEBUG    (10) {__main__ - NetworkScanner.py:490} Build NetworkScanner...
 [2016-06-22 05:01:12] DEBUG    (10) {__main__ - NetworkScanner.py:501} Configure real time...
 [2016-06-22 05:01:12] DEBUG    (10) {__main__ - NetworkScanner.py:509} The scan begins...
@@ -121,18 +98,6 @@ UP: 172.18.0.9
 DOWN:
 
 ~# python NetworkScanner.py -d -I -t 172.18.0.0/28
-
-NetworkScanner  Copyright (C) 2021, 2022  Maurice Lambert
-This program comes with ABSOLUTELY NO WARRANTY.
-This is free software, and you are welcome to redistribute it
-under certain conditions.
-
-
-PythonToolsKit  Copyright (C) 2022  Maurice Lambert
-This program comes with ABSOLUTELY NO WARRANTY.
-This is free software, and you are welcome to redistribute it
-under certain conditions.
-
 [2016-06-22 05:02:24] DEBUG    (10) {__main__ - NetworkScanner.py:651} Build NetworkScanner...
 [2016-06-22 05:02:24] DEBUG    (10) {__main__ - NetworkScanner.py:662} Configure real time...
 [2016-06-22 05:02:24] DEBUG    (10) {__main__ - NetworkScanner.py:670} The scan begins...
@@ -207,18 +172,6 @@ under certain conditions.
 [2016-06-22 05:02:53] DEBUG    (10) {__main__ - NetworkScanner.py:672} Scan end.
 
 ~# python NetworkScanner.py --noping --hostname --ports 22 80 -p 445 139 443 -T 1 -R -t 172.18.0.0/28
-
-NetworkScanner  Copyright (C) 2021, 2022  Maurice Lambert
-This program comes with ABSOLUTELY NO WARRANTY.
-This is free software, and you are welcome to redistribute it
-under certain conditions.
-
-
-PythonToolsKit  Copyright (C) 2022  Maurice Lambert
-This program comes with ABSOLUTELY NO WARRANTY.
-This is free software, and you are welcome to redistribute it
-under certain conditions.
-
 [+] IP: '172.18.0.9' is UP and MAC address is '00:11:22:33:44:55'
 [+] IP: '172.18.0.10' is UP and MAC address is 'aa:bb:cc:dd:ee:ff'
 [-] IP: '172.18.0.13' is DOWN
@@ -234,6 +187,12 @@ under certain conditions.
 [-] IP: '172.18.0.1' is DOWN
 [-] IP: '172.18.0.8' is DOWN
 
+~#
+
+~# python NetworkScanner.py -i 172.18.0. -P -t 172.18.0.0/28
+[+] IP: '172.18.0.9' is UP and MAC address is '00:11:22:33:44:55'
+[+] IP: '172.18.0.10' is UP and MAC address is 'aa:bb:cc:dd:ee:ff'
+^C
 ~#
 
 >>> from NetworkScanner import NetworkScanner, logger
@@ -262,20 +221,24 @@ IP: '172.18.0.3' is UP ('ARP', None).
 172.18.0.1
 [False]
 >>> logger.setLevel(10)  # debug mode
+>>> scanner.scan(passive=True) # passive scan
 >>>
 """
 
-__version__ = "1.0.1"
+__version__ = "2.0.0"
 __author__ = "Maurice Lambert"
 __author_email__ = "mauricelambert434@gmail.com"
 __maintainer__ = "Maurice Lambert"
 __maintainer_email__ = "mauricelambert434@gmail.com"
-__description__ = "This module implements a NetworkScanner."
+__description__ = """
+This module implements a passive NetworkScanner and an active NetworkScanner
+using ARP and ping scan IP sweep and hostname resolution.
+"""
 license = "GPL-3.0 License"
 __url__ = "https://github.com/mauricelambert/NetworkScanner"
 
 copyright = """
-NetworkScanner  Copyright (C) 2021, 2022  Maurice Lambert
+NetworkScanner  Copyright (C) 2021, 2022, 2023  Maurice Lambert
 This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions.
@@ -315,7 +278,7 @@ try:
     from scapy.sendrecv import sendp, send
     from scapy.layers.l2 import Ether, ARP
     from scapy.interfaces import NetworkInterface
-    from scapy.all import Packet, IP, ICMP, AsyncSniffer, TCP
+    from scapy.all import Packet, IP, ICMP, AsyncSniffer, TCP, sniff
     from PythonToolsKit.ScapyTools import ScapyArguments as ArgumentParser
 except ImportError:
     NetworkInterface = TypeVar("NetworkInterface")
@@ -337,7 +300,6 @@ critical: Callable = logger.critical
 async def ping_command(
     command: List[str], ip: str, stdout: int = None
 ) -> bool:
-
     """
     This function executes ping command and checks for success/response.
     """
@@ -360,7 +322,6 @@ async def ping_command(
 
 
 def get_linux_arp_cache() -> bytes:
-
     """
     This function returns ARP cache on Linux.
     """
@@ -436,16 +397,20 @@ class NetworkScanner:
         self.mac = getattr(iface, "mac", None)
 
     def scapy_ping(self, ip: str) -> None:
-
         """
         This function pings a host with Scapy.
         """
 
         debug(f"Send ICMP packet for {ip!r}")
-        send(IP(dst=ip, src=self.ip) / ICMP(), iface=self.iface, verbose=False)
+        sendp(
+            Ether(dst="ff:ff:ff:ff:ff:ff", src=self.mac)
+            / IP(dst=ip, src=self.ip)
+            / ICMP(),
+            iface=self.iface,
+            verbose=False,
+        )
 
     def scapy_arp(self, ip: str) -> None:
-
         """
         This function send an ARP request with Scapy.
         """
@@ -459,7 +424,6 @@ class NetworkScanner:
         )
 
     def scapy_tcp(self, ip: str, dport: int, sport: int) -> None:
-
         """
         This function send a TCP packet with Scapy.
         """
@@ -473,7 +437,6 @@ class NetworkScanner:
         )
 
     def no_scapy_scan(self) -> List[bool]:
-
         """
         This function starts the scan without scapy.
         """
@@ -513,7 +476,6 @@ class NetworkScanner:
         return results
 
     def scapy_match(self, packet: Packet) -> None:
-
         """
         This function gets IP address of matching packets with scapy.
         """
@@ -532,7 +494,6 @@ class NetworkScanner:
             self._handle_UP(ip, mode, packet[Ether].src)
 
     def start_scapy_scan(self) -> List[bool]:
-
         """
         This function starts AsyncSniffer and scapy scan,
         finally stops AsyncSniffer.
@@ -543,6 +504,7 @@ class NetworkScanner:
         info("Start AsyncSniffer using Scapy...")
 
         sniffer = AsyncSniffer(
+        	store=False,
             iface=self.iface,
             lfilter=lambda p: (
                 (ARP in p and p.psrc in _targets)
@@ -568,7 +530,6 @@ class NetworkScanner:
             raise error
 
     def scapy_scan(self) -> List[bool]:
-
         """
         This function starts the scapy scan.
         """
@@ -613,22 +574,43 @@ class NetworkScanner:
 
         return results
 
-    def scan(self, scapy: bool = False) -> List[bool]:
+    def start_passive_scan(self) -> None:
+        """
+        This method starts the passive scan (sniffer).
+        """
 
+        sniff(
+        	store=False,
+            iface=self.iface,
+            lfilter=lambda p: p.haslayer(IP)
+            and p[IP].src in self.targets
+            or p.haslayer(ARP)
+            and p[ARP].psrc in self.targets,
+            prn=self.scapy_match,
+        )
+
+    def scan(self, scapy: bool = False, passive: bool = False) -> List[bool]:
         """
         This function starts the scan (using scapy
         if available otherwise an asynchronous scanner).
         """
 
-        if scapy and SCAPY:
+        if passive and SCAPY:
+            info("Start passive scan.")
+            return self.start_passive_scan()
+        elif passive:
+            raise RuntimeError(
+                "Passive scan require scapy and PythonToolsKit,"
+                " please install requirements first."
+            )
+        elif scapy and SCAPY:
             info("Run scapy scan.")
             return self.start_scapy_scan()
-        else:
-            info("Run asynchronous scan (without scapy).")
-            return self.no_scapy_scan()
+
+        info("Run asynchronous scan (without scapy).")
+        return self.no_scapy_scan()
 
     def handle_UP(self, ip: str, reason: str, detail: Any = None) -> None:
-
         """
         This function is the default behavior when IP is UP.
 
@@ -638,7 +620,6 @@ class NetworkScanner:
         print(f"IP: {ip!r} is UP ({reason!r}, {detail!r}).")
 
     def _handle_UP(self, ip: str, reason: str, detail: Any = None) -> None:
-
         """
         This function is the default behavior when IP is UP.
 
@@ -655,7 +636,6 @@ class NetworkScanner:
         debug(f"Quit handle_UP for {ip!r}.")
 
     def handle_DOWN(self, ip: str) -> None:
-
         """
         This function is the default behavior when IP is DOWN.
 
@@ -665,7 +645,6 @@ class NetworkScanner:
         print(f"IP: {ip!r} is DOWN.")
 
     def _handle_DOWN(self, ip: str) -> None:
-
         """
         This function is the default behavior when IP is DOWN.
 
@@ -678,7 +657,6 @@ class NetworkScanner:
         debug(f"Quit handle_DOWN for {ip!r}.")
 
     async def no_scapy_check_ip(self, ip: str) -> bool:
-
         """
         This function checks the IP address to see if it is being used.
         """
@@ -720,7 +698,6 @@ class NetworkScanner:
 
 class ConsoleScanner(NetworkScanner):
     def handle_DOWN(self, ip: str) -> None:
-
         """
         This function prints IP address down using printf.
         """
@@ -728,7 +705,6 @@ class ConsoleScanner(NetworkScanner):
         printf(f"IP: {ip!r} is DOWN", "NOK")
 
     def handle_UP(self, ip: str, reason: str, detail: Any = None) -> None:
-
         """
         This function prints IP address up using printf.
         """
@@ -748,7 +724,6 @@ class ConsoleScanner(NetworkScanner):
 
 
 def parse_args() -> Namespace:
-
     """
     This function parses the command line arguments.
     """
@@ -769,7 +744,7 @@ def parse_args() -> Namespace:
     )
     add_argument(
         "--noping",
-        "-P",
+        "-g",
         help=(
             "No ping detection. [Without scapy ping "
             "is required for ARP detection]"
@@ -824,12 +799,22 @@ def parse_args() -> Namespace:
         help="Force asynchronous mode, using asyncio instead of scapy.",
         action="store_true",
     )
+    add_argument(
+        "--passive-scan",
+        "--passive",
+        "-P",
+        help=(
+            "Passive scan, sniff the network packets to identify who is up."
+            " This scan is endless because you can never be sure to have "
+            "detected all the IP addresses."
+        ),
+        action="store_true",
+    )
 
     return parser.parse_args()
 
 
 def main() -> int:
-
     """
     This function executes this program from the command line.
     """
@@ -865,7 +850,9 @@ def main() -> int:
         scanner.handle_DOWN = lambda x: None
 
     debug("The scan begins...")
-    scanner.scan(SCAPY and not arguments.force_asynchronous)
+    scanner.scan(
+        SCAPY and not arguments.force_asynchronous, arguments.passive_scan
+    )
     debug("Scan end.")
 
     if no_realtime and print_ip:
